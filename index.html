@@ -370,12 +370,21 @@ function doLogin() {
   const d = document.getElementById("inp-director").value.trim().toLowerCase();
   const k = document.getElementById("inp-key").value.trim().toLowerCase();
   if (d === "suavex" && k === "zhivs") {
+    localStorage.setItem("tsc-auth", "1");
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app-screen").style.display = "block";
     initApp();
   } else {
     document.getElementById("login-error").textContent = "CLEARANCE DENIED";
   }
+}
+
+// Auto-login if already authenticated
+if (localStorage.getItem("tsc-auth") === "1") {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("app-screen").style.display = "block";
+  document.addEventListener("DOMContentLoaded", initApp);
+  if (document.readyState !== "loading") initApp();
 }
 
 // ─── APP INIT ─────────────────────────────────────────────────────────────────
