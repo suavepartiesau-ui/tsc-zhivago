@@ -128,7 +128,17 @@
     color: var(--text); font-size: 11px; line-height: 1.5; letter-spacing: 0.3px;
     transition: all 0.2s ease;
   }
-  .item-row.checked .item-label { color: var(--muted); text-decoration: line-through; }
+
+  .item-initials {
+    flex-shrink: 0; width: 36px; text-align: center;
+    background: #1a1a1a; border: 1px solid #333; border-radius: 5px;
+    color: var(--gold); font-family: 'Courier New', monospace;
+    font-size: 10px; font-weight: 900; letter-spacing: 1px;
+    padding: 4px 2px; outline: none; text-transform: uppercase;
+    transition: border-color 0.2s;
+  }
+  .item-initials:focus { border-color: var(--gold); }
+  .item-initials::placeholder { color: #333; }
 
   /* DONE SCREEN */
   .done-banner {
@@ -337,6 +347,7 @@ const TOTAL = ALL_IDS.length;
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let checked = {};
+let initials = {};
 let collapsed = {};
 let sbClient = null;
 let channel = null;
@@ -401,12 +412,13 @@ async function loadState() {
   try {
     const { data, error } = await sbClient
       .from("tsc_state")
-      .select("checked")
+      .select("checked, initials")
       .eq("id", 1)
       .single();
     if (error && error.code !== "PGRST116") throw error;
     if (data && data.checked) {
       checked = data.checked;
+      initials = data.initials || {};
       updateAllUI();
     }
     setSyncStatus("live");
@@ -421,7 +433,7 @@ async function saveState() {
   try {
     await sbClient
       .from("tsc_state")
-      .upsert({ id: 1, checked: checked, updated_at: new Date().toISOString() });
+      .upsert({ id: 1, checked: checked, initials: initials, updated_at: new Date().toISOString() });
     setSyncStatus("live");
   } catch(e) {
     setSyncStatus("error");
@@ -435,6 +447,7 @@ function subscribeRealtime() {
     .on("postgres_changes", { event: "*", schema: "public", table: "tsc_state" }, payload => {
       if (payload.new && payload.new.checked) {
         checked = payload.new.checked;
+        initials = payload.new.initials || {};
         updateAllUI();
         setSyncStatus("live");
       }
@@ -486,9 +499,20 @@ function renderChecklist() {
         const row = document.createElement("div");
         row.className = "item-row" + (checked[item.id] ? " checked" : "");
         row.id = "row-" + item.id;
-        row.innerHTML = `<div class="item-checkbox" id="chk-${item.id}">${checked[item.id] ? "✓" : ""}</div>
-          <span class="item-label">${item.label}</span>`;
-        row.addEventListener("click", () => toggleItem(item.id));
+        row.innerHTML = `
+          <div class="item-checkbox" id="chk-${item.id}">${checked[item.id] ? "✓" : ""}</div>
+          <span class="item-label">${item.label}</span>
+          <input class="item-initials" id="ini-${item.id}" type="text" maxlength="3" placeholder="--"
+            value="${initials[item.id] || ''}" />`;
+        row.querySelector(".item-checkbox").addEventListener("click", (e) => { e.stopPropagation(); toggleItem(item.id); });
+        row.querySelector(".item-label").addEventListener("click", () => toggleItem(item.id));
+        const iniInput = row.querySelector(".item-initials");
+        iniInput.addEventListener("click", e => e.stopPropagation());
+        iniInput.addEventListener("input", async (e) => {
+          initials[item.id] = e.target.value.toUpperCase();
+          e.target.value = initials[item.id];
+          await saveState();
+        });
         list.appendChild(row);
       });
       sub.appendChild(list);
@@ -517,8 +541,10 @@ function updateAllUI() {
   ALL_IDS.forEach(id => {
     const row = document.getElementById("row-" + id);
     const chk = document.getElementById("chk-" + id);
+    const ini = document.getElementById("ini-" + id);
     if (row) row.className = "item-row" + (checked[id] ? " checked" : "");
     if (chk) chk.textContent = checked[id] ? "✓" : "";
+    if (ini && document.activeElement !== ini) ini.value = initials[id] || "";
   });
   updateProgress();
   updateSectionCount();
