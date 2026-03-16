@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>TSC · Director's Master Script</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --gold: #f5a623;
+    --gold-dim: #7a5210;
+    --bg: #0a0a0a;
+    --surface: #111;
+    --surface2: #1a1a1a;
+    --border: #1e1e1e;
+    --text: #bbb;
+    --muted: #444;
+    --green: #2a9d2a;
+    --red: #cc3333;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .login-box { width: 100%; max-width: 400px; }
+  .logo-wrap { text-align: center; margin-bottom: 48px; }
+  .logo-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px; background: var(--gold); border-radius: 14px;
+    font-size: 30px; margin-bottom: 18px;
+  }
+  .logo-name { color: var(--gold); font-weight: 900; font-size: 20px; letter-spacing: 4px; }
+  .logo-sub { color: #555; font-size: 10px; letter-spacing: 5px; margin-top: 4px; }
+  .login-fields { display: flex; flex-direction: column; gap: 10px; }
+  .login-fields input {
+    background: var(--surface2); border: 1px solid #333; border-radius: 8px;
+    color: #fff; padding: 14px 18px; font-size: 13px; letter-spacing: 3px;
+    text-transform: uppercase; outline: none; font-family: inherit; width: 100%;
+    transition: border-color 0.2s;
+  }
+  .login-fields input:focus { border-color: var(--gold); }
+  .login-btn {
+    background: var(--gold); border: none; border-radius: 8px;
+    color: #000; padding: 14px; font-size: 13px; font-weight: 900;
+    letter-spacing: 3px; cursor: pointer; font-family: inherit; width: 100%;
+    transition: opacity 0.2s;
+  }
+  .login-btn:hover { opacity: 0.85; }
+  .login-error { color: var(--red); text-align: center; font-size: 11px; letter-spacing: 3px; margin-top: 8px; min-height: 20px; }
+  .mission-card {
+    margin-top: 40px; background: var(--surface); border-radius: 12px;
+    padding: 20px 24px; border: 1px solid #222; text-align: center;
+  }
+  .mission-card .label { color: var(--gold); font-size: 10px; letter-spacing: 3px; margin-bottom: 6px; }
+  .mission-card .detail { color: #666; font-size: 11px; line-height: 1.8; }
+
+  /* APP */
+  #app-screen { display: none; padding-bottom: 80px; }
+  .app-header {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .header-logo { display: flex; align-items: center; gap: 10px; }
+  .hlogo-icon {
+    width: 32px; height: 32px; background: var(--gold); border-radius: 7px;
+    display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;
+  }
+  .hlogo-name { color: var(--gold); font-size: 10px; font-weight: 900; letter-spacing: 3px; }
+  .hlogo-sub { color: #444; font-size: 8px; letter-spacing: 2px; margin-top: 2px; }
+  .sync-status { text-align: right; }
+  .sync-dot-wrap { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+  .sync-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green); flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .sync-dot.syncing { background: var(--gold); animation: pulse 0.8s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .sync-label { color: var(--green); font-size: 9px; letter-spacing: 2px; }
+  .sync-label.syncing { color: var(--gold); }
+  .sync-label.error { color: var(--red); }
+  .sync-time { color: #333; font-size: 8px; letter-spacing: 1px; margin-top: 2px; }
+  .progress-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .progress-track { flex: 1; height: 4px; background: #1a1a1a; border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--gold); border-radius: 2px; transition: width 0.4s ease; }
+  .progress-label { color: var(--gold); font-size: 10px; letter-spacing: 1px; min-width: 70px; text-align: right; }
+  .header-date { color: #555; font-size: 8px; letter-spacing: 2px; margin-top: 6px; }
+
+  /* SECTIONS */
+  .checklist-body { padding: 16px; }
+  .section-block { margin-bottom: 24px; }
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--gold);
+    cursor: pointer; user-select: none;
+  }
+  .section-title { color: #fff; font-size: 10px; font-weight: 900; letter-spacing: 2px; flex: 1; }
+  .section-meta { display: flex; align-items: center; gap: 8px; }
+  .section-count { font-size: 9px; letter-spacing: 1px; color: #555; }
+  .section-count.done { color: var(--green); }
+  .section-chevron { color: #555; font-size: 10px; transition: transform 0.2s; }
+  .section-chevron.open { transform: rotate(90deg); }
+  .subsection { margin-top: 14px; }
+  .subsection-title { color: var(--gold); font-size: 9px; letter-spacing: 3px; margin-bottom: 8px; padding-left: 4px; }
+  .items-list { display: flex; flex-direction: column; gap: 4px; }
+  .item-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    background: var(--surface); border: 1px solid var(--border);
+    cursor: pointer; transition: all 0.2s ease; user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .item-row:active { opacity: 0.7; }
+  .item-row.checked { background: #0f1a0f; border-color: #1a3a1a; }
+  .item-checkbox {
+    width: 18px; height: 18px; border-radius: 4px; flex-shrink: 0; margin-top: 1px;
+    border: 1.5px solid #444; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease; font-size: 11px; color: #fff;
+  }
+  .item-row.checked .item-checkbox { background: var(--green); border-color: var(--green); }
+  .item-label {
+    color: var(--text); font-size: 11px; line-height: 1.5; letter-spacing: 0.3px;
+    transition: all 0.2s ease;
+  }
+  .item-row.checked .item-label { color: var(--muted); text-decoration: line-through; }
+
+  /* DONE SCREEN */
+  .done-banner {
+    text-align: center; padding: 32px 20px; margin: 20px 0;
+    border: 1px solid var(--green); border-radius: 12px; background: #0a1a0a;
+    display: none;
+  }
+  .done-banner.show { display: block; }
+  .done-icon { font-size: 32px; margin-bottom: 10px; }
+  .done-title { color: var(--green); font-size: 13px; letter-spacing: 5px; font-weight: 900; }
+  .done-sub { color: #555; font-size: 9px; letter-spacing: 2px; margin-top: 6px; }
+
+  /* CONFIG ERROR */
+  #config-banner {
+    display: none; position: fixed; bottom: 20px; left: 16px; right: 16px; z-index: 999;
+    background: #1a0a0a; border: 1px solid var(--red); border-radius: 10px;
+    padding: 14px 16px; font-size: 10px; letter-spacing: 1px; color: #ff8888; line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── CONFIG: PASTE YOUR SUPABASE DETAILS HERE ──────────────────────────── -->
+<script>
+  const SUPABASE_URL  = "https://nkpdmnwugnzjboebttqz.supabase.co";
+  const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5rcGRtbnd1Z256amJvZWJ0dHF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NDM0ODYsImV4cCI6MjA4OTIxOTQ4Nn0.LaCEJkaVIYp1GWT88zRj2YRqa4DS0axvTXH8dR-V_WU";
+</script>
+<!-- ──────────────────────────────────────────────────────────────────────── -->
+
+<!-- LOGIN SCREEN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="logo-wrap">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-name">THE SUAVE COLLECTIVE</div>
+      <div class="logo-sub">DIRECTOR'S MASTER SCRIPT</div>
+    </div>
+    <div class="login-fields">
+      <input id="inp-director" type="text" placeholder="DIRECTOR" autocomplete="off" autocorrect="off" />
+      <input id="inp-key" type="password" placeholder="KEY" />
+      <button class="login-btn" onclick="doLogin()">UNLOCK</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+    <div class="mission-card">
+      <div class="label">MISSION</div>
+      <div class="detail">THE BASEMENT CHRONICLES<br/>ZHIVAGO ADELAIDE<br/>FRIDAY 20 MARCH 2026 · 10:30PM</div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div id="app-screen">
+  <div class="app-header">
+    <div class="header-top">
+      <div class="header-logo">
+        <div class="hlogo-icon">⚡</div>
+        <div>
+          <div class="hlogo-name">THE SUAVE COLLECTIVE</div>
+          <div class="hlogo-sub">DIRECTOR'S MASTER SCRIPT</div>
+        </div>
+      </div>
+      <div class="sync-status">
+        <div class="sync-dot-wrap">
+          <div class="sync-dot" id="sync-dot"></div>
+          <div class="sync-label" id="sync-label">LIVE</div>
+        </div>
+        <div class="sync-time" id="sync-time"></div>
+      </div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+      <div class="progress-label" id="progress-label">0 / 0 · 0%</div>
+    </div>
+    <div class="header-date">FRI 20 MAR 2026 · ZHIVAGO BASEMENT · 10:30PM – 12:30AM</div>
+  </div>
+
+  <div class="checklist-body" id="checklist-body"></div>
+  <div class="done-banner" id="done-banner">
+    <div class="done-icon">⚡</div>
+    <div class="done-title">MISSION READY</div>
+    <div class="done-sub">BASEMENT CHRONICLES · LOCKED & LOADED</div>
+  </div>
+</div>
+
+<div id="config-banner"></div>
+
+<script>
+// ─── CHECKLIST DATA ───────────────────────────────────────────────────────────
+const CHECKLIST = [
+  { id:"s1", section:"1. PRIMARY OPTICS (A/B RIGS)", subsections:[
+    { id:"s1a", title:"1.1 MAIN BODIES", items:[
+      {id:"1a1",label:"Sony FX3 (A-Cam — VJ Static Wide)"},
+      {id:"1a2",label:"Sony A7SIII (B-Cam — Crowd/Detail)"},
+      {id:"1a3",label:"2x SmallRig Full Cages attached"},
+      {id:"1a4",label:"2x XLR Top Handles (Audio ready)"},
+    ]},
+    { id:"s1b", title:"1.2 LENSES & FILTERS", items:[
+      {id:"1b1",label:"14mm f/1.8 GM (Lens 1: The Descent)"},
+      {id:"1b2",label:"35mm f/1.4 GM (Lens 2: The Reviewer)"},
+      {id:"1b3",label:"85mm f/1.8 (Lens 3: The Confessional)"},
+      {id:"1b4",label:"2x Variable ND Filters (For B-Roll)"},
+      {id:"1b5",label:"Step-up rings (67mm to 82mm)"},
+      {id:"1b6",label:"Lens hoods (Verified for all glass)"},
+    ]},
+  ]},
+  { id:"s2", section:"2. POV & ACTION (GOPRO)", subsections:[
+    { id:"s2a", title:"2.1 UNITS & MOUNTS", items:[
+      {id:"2a1",label:"GoPro Hero 12 (Main POV Chest)"},
+      {id:"2a2",label:"GoPro Hero 11 (Static DJ Booth)"},
+      {id:"2a3",label:'1x Chest Mount (The "Dancefloor POV")'},
+      {id:"2a4",label:"1x Suction Mount (VJ Booth Glass)"},
+      {id:"2a5",label:"1x Head Mount (Technical/VJ POV)"},
+      {id:"2a6",label:"2x Clip Mounts (Booth railings)"},
+    ]},
+    { id:"s2b", title:"2.2 POWER & MEDIA", items:[
+      {id:"2b1",label:"6x Enduro Batteries (Pre-warmed)"},
+      {id:"2b2",label:"3-Slot GoPro Battery Charger"},
+      {id:"2b3",label:"4x 128GB SanDisk Extreme MicroSDs"},
+      {id:"2b4",label:"MicroSD to SD adapter (2x backups)"},
+    ]},
+  ]},
+  { id:"s3", section:"3. MOBILE & LIVE REDUNDANCY", subsections:[
+    { id:"s3a", title:"3.1 IPHONE RIG", items:[
+      {id:"3a1",label:"iPhone 15 Pro Max (Lead Social)"},
+      {id:"3a2",label:"iPhone 14 Pro (Emergency Backup)"},
+      {id:"3a3",label:"DJI Osmo Mobile 6 (Balanced)"},
+      {id:"3a4",label:"MagSafe Battery Pack (Attached)"},
+      {id:"3a5",label:"Filmic Pro / Blackmagic App Log Setup"},
+    ]},
+    { id:"s3b", title:"3.2 LIVESTREAMING TECH", items:[
+      {id:"3b1",label:"Bonded 5G Hotspot (Telstra/Optus)"},
+      {id:"3b2",label:"Teradek VidiU Go / OBS Mobile"},
+      {id:"3b3",label:"iPad Pro (Stream Chat Monitor)"},
+      {id:"3b4",label:"Volt 2 Audio Interface (USB-C)"},
+      {id:"3b5",label:"TSC Custom Overlay PNGs (on iPad)"},
+    ]},
+  ]},
+  { id:"s4", section:"4. AUDIO & COMEDIC SUPPORT", subsections:[
+    { id:"s4a", title:"4.1 CAPTURE UNITS", items:[
+      {id:"4a1",label:"Rode Wireless PRO (32-bit Internal)"},
+      {id:"4a2",label:"2x Lav Mics + Magnets"},
+      {id:"4a3",label:'Shure SM58 (The "Review" Mic)'},
+      {id:"4a4",label:"TSC Mic Flag (Copper/Gold Branding)"},
+      {id:"4a5",label:"Zoom H4n (Room Tone — Static)"},
+    ]},
+    { id:"s4b", title:"4.2 COMEDIC PROPS", items:[
+      {id:"4b1",label:"Whiteboard (Large format)"},
+      {id:"4b2",label:"Copper Liquid Chalk Markers"},
+      {id:"4b3",label:"Collapsible Green Screen (1.5m)"},
+      {id:"4b4",label:'"Good Karma" Business Cards'},
+    ]},
+  ]},
+  { id:"s5", section:"5. POWER & DATA SURVIVAL", subsections:[
+    { id:"s5a", title:"5.1 PHYSICAL POWER", items:[
+      {id:"5a1",label:"8x NP-FZ100 Batteries (Verified)"},
+      {id:"5a2",label:"2x 20k mAh Power Banks (USB-C PD)"},
+      {id:"5a3",label:"2x V-Mount Battery plates (Basecamp)"},
+      {id:"5a4",label:"Multi-port Wall Charger (Gann)"},
+    ]},
+    { id:"s5b", title:"5.2 THE DATA LOCK", items:[
+      {id:"5b1",label:"4x 128GB V90 SD Cards (Main)"},
+      {id:"5b2",label:"2x 256GB CFExpress Type A"},
+      {id:"5b3",label:"2TB Samsung T7 SSD (Field Backup)"},
+      {id:"5b4",label:"MacBook Pro + Card Reader"},
+    ]},
+  ]},
+  { id:"s6", section:"6. DEPLOYMENT TIMELINE (10:30PM – 12:30AM)", subsections:[
+    { id:"s6a", title:"6.1 THE INGRESS (10:30–10:45)", items:[
+      {id:"6a1",label:"Gear Carry: Navigate stairs. Primary rigs in hands; support bags on backs."},
+      {id:"6a2",label:"Establish Base: VJ Booth setup. Secure 2TB SSD to MacBook for rolling backups."},
+      {id:"6a3",label:'Suave Beep: All 4 cameras + Audio on. Perform "Suave Clap" for visual/audio sync.'},
+    ]},
+    { id:"s6b", title:"6.2 TECHNICAL CALIBRATION (10:45–11:15)", items:[
+      {id:"6b1",label:"Stream Stress: Fire up 5G Hotspot. Run 3-min private stream. Check latency."},
+      {id:"6b2",label:"Anti-Fog: Apply solution to FX3, A7SIII, and both GoPros."},
+      {id:"6b3",label:'Lighting: Place Aputure MCs (Copper hue) in "Review Corner." Verify ISO 12,800.'},
+    ]},
+    { id:"s6c", title:"6.3 PHASE 1 — THE NOSTALGIA (11:15–11:45)", items:[
+      {id:"6c1",label:'A-Roll: High-angle 14mm shots of the line-up. Capture "TSC" watermark on VJ screens.'},
+      {id:"6c2",label:'The Reviews: Approach 3 groups. "Rank this basement vibe out of 10."'},
+      {id:"6c3",label:"POV Move: Activate GoPro Chest Mount. Walk through main room twice."},
+    ]},
+    { id:"s6d", title:"6.4 PHASE 2 — PEAK CHAOS / THE ROAST (11:45–12:15)", items:[
+      {id:"6d1",label:"The Roast: Activate live type-on screen. B-Cam on people being roasted."},
+      {id:"6d2",label:"Confessionals: Trigger 5x participants in ring-lit corner. 32-bit float active."},
+      {id:"6d3",label:"The Drop: Capture midnight bass drop in 120fps (Slow-mo sauce)."},
+    ]},
+    { id:"s6e", title:"6.5 PHASE 3 — EXTRACTION (12:15–12:30)", items:[
+      {id:"6e1",label:"Stream Wrap: Final shoutout to Suave Collective viewers. End stream."},
+      {id:"6e2",label:"Data Dump: Swap all SD cards. Copy 100% of files to Samsung T7 SSD."},
+      {id:"6e3",label:"GoPro Check: Verify no units overheated. Clear condensation before packing."},
+    ]},
+  ]},
+  { id:"s7", section:'7. CONTINGENCY — "NO DRAMA" GUARDRAIL', subsections:[
+    { id:"s7a", title:"7.1 PROTOCOLS", items:[
+      {id:"7a1",label:"Audio Spike: DJ Redlines → switch SM58 to Camera Mic 2 (-20dB safety)."},
+      {id:"7a2",label:'Intoxicated Patron: Review goes south → smile, stop recording, move to "Stairs" B-Roll.'},
+      {id:"7a3",label:"Equipment Fail: A-Cam fails → iPhone 15 Pro Max replaces on tripod immediately."},
+      {id:"7a4",label:'IP Protection: Unauthorized person touches rigs → state "Proprietary TSC Property."'},
+    ]},
+  ]},
+];
+
+const ALL_IDS = CHECKLIST.flatMap(s => s.subsections.flatMap(ss => ss.items.map(i => i.id)));
+const TOTAL = ALL_IDS.length;
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let checked = {};
+let collapsed = {};
+let sbClient = null;
+let channel = null;
+
+// ─── INIT SUPABASE ────────────────────────────────────────────────────────────
+function initSupabase() {
+  if (SUPABASE_URL === "PASTE_YOUR_SUPABASE_URL_HERE" || SUPABASE_ANON === "PASTE_YOUR_SUPABASE_ANON_KEY_HERE") {
+    showConfigBanner();
+    return false;
+  }
+  try {
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    return true;
+  } catch(e) {
+    showConfigBanner("Supabase init failed: " + e.message);
+    return false;
+  }
+}
+
+function showConfigBanner(msg) {
+  const b = document.getElementById("config-banner");
+  b.style.display = "block";
+  b.innerHTML = msg || "⚠ Supabase not configured. Open the HTML file, paste your SUPABASE_URL and SUPABASE_ANON_KEY at the top of the &lt;script&gt; block, then redeploy.";
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+document.getElementById("inp-key").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+document.getElementById("inp-director").addEventListener("keydown", e => { if(e.key==="Enter") doLogin(); });
+
+function doLogin() {
+  const d = document.getElementById("inp-director").value.trim().toLowerCase();
+  const k = document.getElementById("inp-key").value.trim().toLowerCase();
+  if (d === "suavex" && k === "zhivs") {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app-screen").style.display = "block";
+    initApp();
+  } else {
+    document.getElementById("login-error").textContent = "CLEARANCE DENIED";
+  }
+}
+
+// ─── APP INIT ─────────────────────────────────────────────────────────────────
+async function initApp() {
+  renderChecklist();
+  if (!initSupabase()) return;
+  await loadState();
+  subscribeRealtime();
+}
+
+// ─── LOAD STATE ───────────────────────────────────────────────────────────────
+async function loadState() {
+  setSyncStatus("syncing");
+  try {
+    const { data, error } = await sbClient
+      .from("tsc_state")
+      .select("checked")
+      .eq("id", 1)
+      .single();
+    if (error && error.code !== "PGRST116") throw error;
+    if (data && data.checked) {
+      checked = data.checked;
+      updateAllUI();
+    }
+    setSyncStatus("live");
+  } catch(e) {
+    setSyncStatus("error");
+  }
+}
+
+// ─── SAVE STATE ───────────────────────────────────────────────────────────────
+async function saveState() {
+  setSyncStatus("syncing");
+  try {
+    await sbClient
+      .from("tsc_state")
+      .upsert({ id: 1, checked: checked, updated_at: new Date().toISOString() });
+    setSyncStatus("live");
+  } catch(e) {
+    setSyncStatus("error");
+  }
+}
+
+// ─── REALTIME ─────────────────────────────────────────────────────────────────
+function subscribeRealtime() {
+  channel = sbClient
+    .channel("tsc-state-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "tsc_state" }, payload => {
+      if (payload.new && payload.new.checked) {
+        checked = payload.new.checked;
+        updateAllUI();
+        setSyncStatus("live");
+      }
+    })
+    .subscribe();
+}
+
+// ─── SYNC STATUS ──────────────────────────────────────────────────────────────
+function setSyncStatus(status) {
+  const dot = document.getElementById("sync-dot");
+  const label = document.getElementById("sync-label");
+  const time = document.getElementById("sync-time");
+  dot.className = "sync-dot" + (status !== "live" ? " " + status : "");
+  label.className = "sync-label" + (status !== "live" ? " " + status : "");
+  const map = { live:"LIVE", syncing:"SYNCING", error:"OFFLINE" };
+  label.textContent = map[status] || "LIVE";
+  if (status === "live") time.textContent = new Date().toLocaleTimeString();
+}
+
+// ─── RENDER CHECKLIST ─────────────────────────────────────────────────────────
+function renderChecklist() {
+  const body = document.getElementById("checklist-body");
+  body.innerHTML = "";
+  CHECKLIST.forEach(s => {
+    const block = document.createElement("div");
+    block.className = "section-block";
+    block.id = "block-" + s.id;
+
+    const header = document.createElement("div");
+    header.className = "section-header";
+    header.innerHTML = `
+      <div class="section-title">${s.section.toUpperCase()}</div>
+      <div class="section-meta">
+        <span class="section-count" id="count-${s.id}">0/0</span>
+        <span class="section-chevron open" id="chev-${s.id}">▶</span>
+      </div>`;
+    header.addEventListener("click", () => toggleSection(s.id));
+    block.appendChild(header);
+
+    const content = document.createElement("div");
+    content.id = "content-" + s.id;
+    s.subsections.forEach(ss => {
+      const sub = document.createElement("div");
+      sub.className = "subsection";
+      sub.innerHTML = `<div class="subsection-title">${ss.title}</div>`;
+      const list = document.createElement("div");
+      list.className = "items-list";
+      ss.items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "item-row" + (checked[item.id] ? " checked" : "");
+        row.id = "row-" + item.id;
+        row.innerHTML = `<div class="item-checkbox" id="chk-${item.id}">${checked[item.id] ? "✓" : ""}</div>
+          <span class="item-label">${item.label}</span>`;
+        row.addEventListener("click", () => toggleItem(item.id));
+        list.appendChild(row);
+      });
+      sub.appendChild(list);
+      content.appendChild(sub);
+    });
+    block.appendChild(content);
+    body.appendChild(block);
+  });
+  updateProgress();
+}
+
+// ─── TOGGLE ITEM ─────────────────────────────────────────────────────────────
+async function toggleItem(id) {
+  checked[id] = !checked[id];
+  // Update UI immediately for responsiveness
+  const row = document.getElementById("row-" + id);
+  const chk = document.getElementById("chk-" + id);
+  if (row) { row.className = "item-row" + (checked[id] ? " checked" : ""); }
+  if (chk) { chk.textContent = checked[id] ? "✓" : ""; }
+  updateProgress();
+  updateSectionCount();
+  await saveState();
+}
+
+function updateAllUI() {
+  ALL_IDS.forEach(id => {
+    const row = document.getElementById("row-" + id);
+    const chk = document.getElementById("chk-" + id);
+    if (row) row.className = "item-row" + (checked[id] ? " checked" : "");
+    if (chk) chk.textContent = checked[id] ? "✓" : "";
+  });
+  updateProgress();
+  updateSectionCount();
+}
+
+function updateProgress() {
+  const done = ALL_IDS.filter(id => checked[id]).length;
+  const pct = Math.round((done / TOTAL) * 100);
+  document.getElementById("progress-fill").style.width = pct + "%";
+  document.getElementById("progress-label").textContent = `${done} / ${TOTAL} · ${pct}%`;
+  const banner = document.getElementById("done-banner");
+  banner.className = "done-banner" + (pct === 100 ? " show" : "");
+}
+
+function updateSectionCount() {
+  CHECKLIST.forEach(s => {
+    const items = s.subsections.flatMap(ss => ss.items);
+    const done = items.filter(i => checked[i.id]).length;
+    const el = document.getElementById("count-" + s.id);
+    if (el) {
+      el.textContent = `${done}/${items.length}`;
+      el.className = "section-count" + (done === items.length ? " done" : "");
+    }
+  });
+}
+
+function toggleSection(id) {
+  collapsed[id] = !collapsed[id];
+  const content = document.getElementById("content-" + id);
+  const chev = document.getElementById("chev-" + id);
+  if (content) content.style.display = collapsed[id] ? "none" : "block";
+  if (chev) chev.className = "section-chevron" + (collapsed[id] ? "" : " open");
+}
+</script>
+</body>
+</html>
